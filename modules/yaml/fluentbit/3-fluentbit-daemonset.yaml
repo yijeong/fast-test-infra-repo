@@ -1,0 +1,119 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fluent-bit-2022
+  namespace: fluentbit
+  labels:
+    k8s-app: fluent-bit-2022
+    version: v1
+    kubernetes.io/cluster-service: 'true'
+spec:
+  selector:
+    matchLabels:
+      k8s-app: fluent-bit-2022
+  template:
+    metadata:
+      labels:
+        k8s-app: fluent-bit-2022
+        version: v1
+        kubernetes.io/cluster-service: 'true'
+    spec:
+      nodeSelector:
+        nodeType: service
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: fluent-bit
+          image: public.ecr.aws/aws-observability/aws-for-fluent-bit:2.25.1
+          imagePullPolicy: Always
+          env:
+            - name: AWS_REGION
+              valueFrom:
+                configMapKeyRef:
+                  name: fluent-bit-cluster-info
+                  key: logs.region
+            - name: CLUSTER_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: fluent-bit-cluster-info
+                  key: cluster.name
+            - name: HTTP_SERVER
+              valueFrom:
+                configMapKeyRef:
+                  name: fluent-bit-cluster-info
+                  key: http.server
+            - name: HTTP_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: fluent-bit-cluster-info
+                  key: http.port
+            - name: READ_FROM_HEAD
+              valueFrom:
+                configMapKeyRef:
+                  name: fluent-bit-cluster-info
+                  key: read.head
+            - name: READ_FROM_TAIL
+              valueFrom:
+                configMapKeyRef:
+                  name: fluent-bit-cluster-info
+                  key: read.tail
+            - name: HOST_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: CI_VERSION
+              value: 'k8s/1.3.7'
+          resources:
+            limits:
+              cpu: 300m
+              memory: 600Mi
+            requests:
+              cpu: 300m
+              memory: 248Mi
+          volumeMounts:
+            # Please don't change below read-only permissions
+            - name: fluentbitstate
+              mountPath: /var/fluent-bit/state
+            - name: varlog
+              mountPath: /var/log
+              readOnly: true
+            - name: varlibdockercontainers
+              mountPath: /var/lib/docker/containers
+              readOnly: true
+            - name: fluent-bit-config
+              mountPath: /fluent-bit/etc/
+            - name: runlogjournal
+              mountPath: /run/log/journal
+              readOnly: true
+            - name: dmesg
+              mountPath: /var/log/dmesg
+              readOnly: true
+      terminationGracePeriodSeconds: 20
+      volumes:
+        - name: fluentbitstate
+          hostPath:
+            path: /var/fluent-bit/state
+        - name: varlog
+          hostPath:
+            path: /var/log
+        - name: varlibdockercontainers
+          hostPath:
+            path: /var/lib/docker/containers
+        - name: fluent-bit-config
+          configMap:
+            name: fluent-bit-config
+        - name: runlogjournal
+          hostPath:
+            path: /run/log/journal
+        - name: dmesg
+          hostPath:
+            path: /var/log/dmesg
+      serviceAccountName: fluent-bit
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+        - operator: 'Exists'
+          effect: 'NoExecute'
+        - operator: 'Exists'
+          effect: 'NoSchedule'
