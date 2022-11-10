@@ -35,6 +35,11 @@ module "eks" {
   # Cluster Logging
   cluster_enabled_log_types = ["api"]
 
+  tags = {
+    "karpenter.sh/discovery" = local.cluster_name
+  }
+
+
   # Lunch Template Worker Node
   self_managed_node_group_defaults = {
     instance_type = "t3.large"
@@ -141,4 +146,11 @@ resource "aws_ec2_tag" "private_subnet_cluster_tag" {
   resource_id = each.value
   key         = "kubernetes.io/cluster/${local.cluster_name}"
   value       = "owned"
+}
+
+resource "aws_ec2_tag" "private_subnet_karpenter_tag" {
+  for_each    = toset(local.private_subnets)
+  resource_id = each.value
+  key         = "karpenter.sh/discovery"
+  value       = local.cluster_name
 }
