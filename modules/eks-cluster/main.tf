@@ -36,6 +36,10 @@ module "eks" {
   # Cluster Logging
   cluster_enabled_log_types = ["api"]
 
+  tags = {
+    "karpenter.sh/discovery" = local.cluster_name
+  }
+
   # Extend node-to-node security group rules
   node_security_group_additional_rules = {
     ingress_self_all = {
@@ -70,6 +74,14 @@ module "eks" {
       to_port                       = 4443
       source_cluster_security_group = true
       description                   = "Allow access from control plane to worker for metric-server apiservice"
+    }
+    ingress_nodes_karpenter_port = {
+      description                   = "Cluster API to Node group for Karpenter webhook"
+      protocol                      = "tcp"
+      from_port                     = 8443
+      to_port                       = 8443
+      type                          = "ingress"
+      source_cluster_security_group = true
     }
   }
 
@@ -111,8 +123,8 @@ module "eks" {
 
   # cluster_endpoint_public_access_cidrs = ["211.45.193.101/32"]
   # Self managed node groups will not automatically create the aws-auth configmap so we need to  :
-  create_aws_auth_configmap = true
-  manage_aws_auth_configmap = true
+  # create_aws_auth_configmap = true
+  # manage_aws_auth_configmap = true
 
   # console identity mapping (AWS SSO user)
   # eks configmap aws-auth에 콘솔 사용자 혹은 역할을 등록
@@ -150,4 +162,11 @@ resource "aws_ec2_tag" "private_subnet_cluster_tag" {
   resource_id = each.value
   key         = "kubernetes.io/cluster/${local.cluster_name}"
   value       = "owned"
+}
+
+resource "aws_ec2_tag" "private_subnet_karpenter_tag" {
+  for_each    = toset(local.private_subnets)
+  resource_id = each.value
+  key         = "karpenter.sh/discovery"
+  value       = local.cluster_name
 }
