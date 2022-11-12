@@ -167,6 +167,6 @@ resource "aws_ec2_tag" "private_subnet_cluster_tag" {
 resource "aws_ec2_tag" "private_subnet_karpenter_tag" {
   for_each    = toset(local.private_subnets)
   resource_id = each.value
-  key         = "karpenter.sh/discovery"
+  key         = "karpenter.sh/discovery${local.cluster_name}"
   value       = local.cluster_name
 }
